@@ -1,0 +1,8 @@
+[project]
+name = "PPP-universial"
+version = "0.1.0"
+requires-python = ">= 3.14.5"
+dependencies = [
+    "biopython",
+    "PySide6",
+]
