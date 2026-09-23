@@ -16,7 +16,7 @@ Protein Param Pro is a desktop application for organizing protein sequences and 
 
 Protein Param Pro accepts the 20 standard one-letter amino-acid codes. Whitespace and `*` stop characters are removed automatically when a sequence is saved or imported.
 
-![Protein Param Pro protein library](screenshots/PPP.png)
+![Protein Param Pro protein library](PPP.png)
 
 ## Using the application
 
