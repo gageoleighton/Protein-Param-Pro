@@ -16,6 +16,8 @@ Protein Param Pro is a desktop application for organizing protein sequences and 
 
 Protein Param Pro accepts the 20 standard one-letter amino-acid codes. Whitespace and `*` stop characters are removed automatically when a sequence is saved or imported.
 
+![Protein Param Pro protein library](screenshots/PPP.png)
+
 ## Using the application
 
 Create a protein with **New protein**, or use **Import FASTA** to add several records at once. Select a folder in the sidebar to filter the table, and drag proteins or folders in the tree to reorganize the library.
@@ -85,7 +87,7 @@ These values are computational estimates and should be checked against an approp
 - [Biopython](https://biopython.org/) for protein sequence analysis
 - [PySide6](https://doc.qt.io/qtforpython-6/) for the desktop interface
 - [PyInstaller](https://pyinstaller.org/) for application packaging
-- [Sentry](https://sentry.io/) for optional error reporting
+- [Sentry](https://sentry.io/) for error reporting
 
 ## Support
 
