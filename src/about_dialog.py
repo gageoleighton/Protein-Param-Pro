@@ -11,6 +11,8 @@ from PySide6.QtWidgets import QDialog, QDialogButtonBox, QFormLayout, QLabel, QV
 
 from app_info import APP_CONTACT, APP_DESCRIPTION, APP_NAME, APP_VERSION, APP_WEBSITE
 
+import sentry_sdk
+
 
 class AboutDialog(QDialog):
     """Display application identity, version, and support information."""
@@ -50,6 +52,9 @@ class AboutDialog(QDialog):
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
+
+        sentry_sdk.capture_message("Protein Param Pro Sentry test")
+        sentry_sdk.flush(timeout=2)
 
     @staticmethod
     def link_label(url: str, text: str) -> QLabel:

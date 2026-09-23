@@ -26,6 +26,8 @@ class Protein:
     sequence: str
     group: str = "My proteins"
     color: str = ""
+    notes: str = ""
+    absorbance_280: float | None = None
 
 
 def normalise_sequence(value: str) -> str:

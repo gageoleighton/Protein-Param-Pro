@@ -5,7 +5,10 @@ a = Analysis(
     ['src/main.py'],
     pathex=[],
     binaries=[],
-    datas=[('icons/favicon_io/android-chrome-512x512.png', 'icons/favicon_io')],
+    datas=[
+        ('icons/favicon_io/android-chrome-512x512.png', 'icons/favicon_io'),
+        ('sentry_config.json', '.'),
+    ],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -21,7 +24,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='ProteinParamPro',
+    name='Protein Param Pro',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -40,11 +43,11 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='ProteinParamPro',
+    name='Protein Param Pro',
 )
 app = BUNDLE(
     coll,
     name='ProteinParamPro.app',
     icon='ProteinParamPro.icns',
-    bundle_identifier=None,
+    bundle_identifier="com.gageoleighton.proteinparampro"
 )
