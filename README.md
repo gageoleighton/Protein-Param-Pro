@@ -130,3 +130,12 @@ References: [Avidity AviTag](https://www.avidity.com/), [IBA Strep/Twin-Strep se
 Fixed tag references are matched at **≥95% sequence identity**, calculated as `100 × matching residues / reference length` over a full-length, ungapped window. This is sequence similarity, not a statistical confidence estimate. The Features table shows **Identity** and **Substitutions**, and displays the actual observed sequence. Colors, legend hover, and feature coordinates also work for variant matches.
 
 The allowed substitution count is rounded down: mature MBP (370 residues) allows 18; GST core (217) allows 10; Twin-Strep (28) allows 1. AviTag (15) and other tags shorter than 20 residues require exact matches at this threshold. The optional initial methionine on MBP/GST is included in highlighted coordinates when present but excluded from core identity scoring. Protease motifs and variable His runs keep their original detection rules. Insertions, deletions, and partial-domain matches are not aligned or inferred.
+
+
+### Checking for updates
+
+Use **Check for Updates…** in the sidebar or **Help → Check for Updates…**. The app checks the latest published stable release through GitHub's public Releases API and compares its version tag with the installed version. A newer release offers an **Open Release Page** button for downloading and installing it manually. A background check also runs once at startup and only shows a notification when a newer release is available. Startup errors and no-update results stay silent. No update is automatically downloaded or installed.
+
+Checks run without blocking the interface and time out after 15 seconds. Manual checks report unavailable releases, connection failures, or GitHub rate limits. The request sends the application version and normal connection metadata to GitHub; it does not send protein sequences or library files. Publish releases with version tags such as `v0.1.2`. Drafts and prereleases are excluded. Existing installations need this version installed before they can use the checker.
+
+API reference: [GitHub's latest release endpoint](https://docs.github.com/en/rest/releases/releases#get-the-latest-release).

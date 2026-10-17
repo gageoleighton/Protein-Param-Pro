@@ -7,8 +7,8 @@ import math
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import QItemSelectionModel, Qt, Signal
-from PySide6.QtGui import QColor, QIcon, QPainter, QPixmap
+from PySide6.QtCore import QItemSelectionModel, Qt, QTimer, QUrl, Signal
+from PySide6.QtGui import QColor, QDesktopServices, QIcon, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView, QComboBox, QColorDialog, QFileDialog, QFormLayout, QFrame, QHBoxLayout,
     QHeaderView, QInputDialog, QLabel, QLineEdit, QMainWindow, QMenu, QMessageBox, QPushButton,
@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 
 from about_dialog import AboutDialog
 from app_info import APP_NAME, APP_VERSION
+from update_checker import UpdateChecker
 from protein import Protein, normalise_sequence, protein_properties
 from protein_analysis_dialog import ProteinAnalysisDialog
 from protein_dialog import ProteinDialog
@@ -123,12 +124,24 @@ class MainWindow(QMainWindow):
         self.last_used_folder = self.proteins[-1].group if self.proteins else "My proteins"
         self.collapsed_folders = load_collapsed_folders()
         self.restoring_folder_state = False
+        self.silent_update_check = True
+        self.update_checker = UpdateChecker(self)
         self.build_ui()
+        self.update_checker.busy_changed.connect(self.update_check_busy)
+        self.update_checker.completed.connect(self.show_update_result)
+        self.update_checker.failed.connect(self.show_update_error)
         self.refresh()
+        self.startup_update_timer = QTimer(self)
+        self.startup_update_timer.setSingleShot(True)
+        self.startup_update_timer.timeout.connect(lambda: self.check_for_updates(silent=True))
+        self.startup_update_timer.start(0)
 
     def build_ui(self) -> None:
         self.setStatusBar(QStatusBar())
         self.statusBar().showMessage("Ready")
+        help_menu = self.menuBar().addMenu("Help")
+        self.check_updates_action = help_menu.addAction("Check for Updates…")
+        self.check_updates_action.triggered.connect(lambda: self.check_for_updates())
 
         splitter = QSplitter()
         splitter.setChildrenCollapsible(False)
@@ -216,10 +229,56 @@ class MainWindow(QMainWindow):
         self.tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.tree.customContextMenuRequested.connect(self.show_tree_context_menu)
         layout.addWidget(self.tree, 1)
+        self.check_updates_button = QPushButton("Check for Updates…")
+        self.check_updates_button.clicked.connect(lambda: self.check_for_updates())
+        layout.addWidget(self.check_updates_button)
         layout.addWidget(QLabel(
             "Protein data stays on this computer. Anonymous crash diagnostics reported."
         ))
         return panel
+
+    def check_for_updates(self, *, silent: bool = False) -> None:
+        self.startup_update_timer.stop()
+        self.silent_update_check = silent
+        if self.update_checker.reply is not None:
+            # A manual request can reuse the in-flight startup check.
+            self.update_check_busy(True)
+            return
+        self.update_checker.check()
+
+    def update_check_busy(self, busy: bool) -> None:
+        if self.silent_update_check:
+            return
+        self.check_updates_action.setEnabled(not busy)
+        self.check_updates_button.setEnabled(not busy)
+        self.check_updates_button.setText("Checking…" if busy else "Check for Updates…")
+        self.statusBar().showMessage("Checking GitHub for updates…" if busy else "Ready")
+
+    def show_update_error(self, message: str) -> None:
+        if self.silent_update_check:
+            return
+        QMessageBox.warning(self, "Update check unavailable", message)
+
+    def show_update_result(self, release) -> None:
+        if not release.newer:
+            if self.silent_update_check:
+                return
+            QMessageBox.information(self, "No update available",
+                                    f"You are running version {APP_VERSION}.\n"
+                                    f"The latest published release is {release.version}.\n"
+                                    "No newer release is available.")
+            return
+        dialog = QMessageBox(self)
+        dialog.setWindowTitle("Update available")
+        dialog.setIcon(QMessageBox.Icon.Information)
+        dialog.setText(f"Protein Param Pro {release.version} is available.")
+        dialog.setInformativeText(f"You are running {APP_VERSION}. Open the release page to download the update.")
+        download = dialog.addButton("Open Release Page", QMessageBox.ButtonRole.AcceptRole)
+        dialog.addButton(QMessageBox.StandardButton.Cancel)
+        dialog.exec()
+        if dialog.clickedButton() is download:
+            if not QDesktopServices.openUrl(QUrl(release.url)):
+                QMessageBox.warning(self, "Could not open browser", f"Open this address in your browser:\n{release.url}")
 
     def show_about(self) -> None:
         AboutDialog(str(APP_ICON_PATH), self).exec()
