@@ -144,7 +144,7 @@ class MainWindow(QMainWindow):
         subheading.setObjectName("subheading")
         layout.addWidget(subheading)
         self.table = QTableWidget(0, 8)
-        self.table.setHorizontalHeaderLabels(["Name", "Amino Acids", "Weight (kDa)", "ε 280", "ε 214 (est.)", "A280", "A280 concentration", "A214 concentration"])
+        self.table.setHorizontalHeaderLabels(["Name", "Amino Acids", "Weight (kDa)", "ε 280", "ε 214 (est.)", "Absorbance", "A280 concentration", "A214 concentration"])
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
@@ -236,9 +236,8 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.detail_label)
         self.absorbance_label = QLabel("Absorbance")
         layout.addWidget(self.absorbance_label)
-        self.saved_a214_input = ""
-        self.saved_complex_a280_input = ""
-        self.detail_input_mode = "single_a280"
+        self.saved_complex_input = ""
+        self.detail_input_mode = "single_protein"
         self.absorbance = QLineEdit()
         self.absorbance.setPlaceholderText("e.g. 0.85")
         self.absorbance.setMaximumWidth(105)
@@ -764,7 +763,7 @@ class MainWindow(QMainWindow):
         self.table.setRowCount(len(rows))
         for row, (index, protein) in enumerate(rows):
             props = protein_properties(protein.sequence)
-            values = [protein.name, str(props["length"]), f"{props['mw'] / 1000:.2f} kDa", f"{props['e280']:,}", f"{props['e214']:,}", "", self.a280_concentration(protein), "—"]
+            values = [protein.name, str(props["length"]), f"{props['mw'] / 1000:.2f} kDa", f"{props['e280']:,}", f"{props['e214']:,}", "", self.protein_concentration(protein, "e280"), self.protein_concentration(protein, "e214")]
             for column, value in enumerate(values):
                 item = QTableWidgetItem(value)
                 if column == 0:
@@ -777,9 +776,9 @@ class MainWindow(QMainWindow):
             absorbance_input.setObjectName("proteinAbsorbanceInput")
             absorbance_input.ensurePolished()
             absorbance_input.setAlignment(Qt.AlignmentFlag.AlignRight)
-            absorbance_input.setPlaceholderText("Enter A280")
-            absorbance_input.setText("" if protein.absorbance_280 is None else str(protein.absorbance_280))
-            absorbance_input.setToolTip("Saved A280 for this protein (1 cm optical path). Clear to remove.")
+            absorbance_input.setPlaceholderText("Enter absorbance")
+            absorbance_input.setText("" if protein.absorbance is None else str(protein.absorbance))
+            absorbance_input.setToolTip("Saved absorbance used for both A280 and A214 estimates (1 cm optical path). Clear to remove.")
             absorbance_input.textChanged.connect(
                 lambda text, record=protein, editor=absorbance_input: self.save_protein_absorbance(record, editor, text)
             )
@@ -813,13 +812,13 @@ class MainWindow(QMainWindow):
         return QIcon(pixmap)
 
     @staticmethod
-    def a280_concentration(protein: Protein) -> str:
-        if protein.absorbance_280 is None:
+    def protein_concentration(protein: Protein, coefficient: str) -> str:
+        if protein.absorbance is None:
             return "—"
         props = protein_properties(protein.sequence)
-        if not props["e280"]:
+        if not props[coefficient]:
             return "n/a"
-        return f"{protein.absorbance_280 / props['e280'] * props['mw']:.3f} mg/mL"
+        return f"{protein.absorbance / props[coefficient] * props['mw']:.3f} mg/mL"
 
     def save_protein_absorbance(self, protein: Protein, editor: QLineEdit, text: str) -> None:
         try:
@@ -828,17 +827,18 @@ class MainWindow(QMainWindow):
                 raise ValueError
         except ValueError:
             editor.setStyleSheet("border: 1px solid #bc4545;")
-            editor.setToolTip("Enter a finite, non-negative A280. This entry has not been saved.")
+            editor.setToolTip("Enter a finite, non-negative absorbance. This entry has not been saved.")
             return
         editor.setStyleSheet("")
-        editor.setToolTip("Saved A280 for this protein (1 cm optical path). Clear to remove.")
+        editor.setToolTip("Saved absorbance used for both A280 and A214 estimates (1 cm optical path). Clear to remove.")
         if not any(record is protein for record in self.proteins):
             return
-        protein.absorbance_280 = value
+        protein.absorbance = value
         self.save()
         for row in range(self.table.rowCount()):
             if self.table.cellWidget(row, 5) is editor:
-                self.table.item(row, 6).setText(self.a280_concentration(protein))
+                self.table.item(row, 6).setText(self.protein_concentration(protein, "e280"))
+                self.table.item(row, 7).setText(self.protein_concentration(protein, "e214"))
                 break
         self.update_detail()
 
@@ -885,25 +885,22 @@ class MainWindow(QMainWindow):
     def update_detail(self) -> None:
         indices = self.selected_indices()
         self.update_stoichiometry_controls(indices)
-        is_a280 = self.wavelength.currentText() == "A280"
-        # Keep calculator measurements separate from each record's saved A280.
-        if self.detail_input_mode == "a214":
-            self.saved_a214_input = self.absorbance.text()
-        elif self.detail_input_mode == "complex_a280":
-            self.saved_complex_a280_input = self.absorbance.text()
-        single_a280 = is_a280 and len(indices) <= 1
-        self.detail_input_mode = "single_a280" if single_a280 else ("complex_a280" if is_a280 else "a214")
-        self.absorbance.setReadOnly(single_a280)
-        self.absorbance_label.setText("Complex A280" if is_a280 and len(indices) > 1 else "Absorbance")
-        record_a280 = self.proteins[indices[0]].absorbance_280 if single_a280 and indices else None
-        if single_a280:
-            input_text = f"{record_a280:.6g}" if record_a280 is not None else ""
+        # Keep complex measurements separate from each record's saved absorbance.
+        if self.detail_input_mode == "complex":
+            self.saved_complex_input = self.absorbance.text()
+        single_protein = len(indices) <= 1
+        self.detail_input_mode = "single_protein" if single_protein else "complex"
+        self.absorbance.setReadOnly(single_protein)
+        self.absorbance_label.setText("Complex absorbance" if len(indices) > 1 else "Absorbance")
+        record_absorbance = self.proteins[indices[0]].absorbance if single_protein and indices else None
+        if single_protein:
+            input_text = f"{record_absorbance:.6g}" if record_absorbance is not None else ""
         else:
-            input_text = self.saved_complex_a280_input if is_a280 else self.saved_a214_input
+            input_text = self.saved_complex_input
         self.absorbance.blockSignals(True)
         self.absorbance.setText(input_text)
         self.absorbance.blockSignals(False)
-        self.absorbance.setPlaceholderText("Use table A280" if single_a280 else "e.g. 0.85")
+        self.absorbance.setPlaceholderText("Use table value" if single_protein else "e.g. 0.85")
         if not indices:
             self.detail_label.setText("Select one or more proteins to calculate concentration.")
             self.concentration.setText("—")
@@ -924,10 +921,8 @@ class MainWindow(QMainWindow):
         label = self.proteins[indices[0]].name if len(indices) == 1 else f"Protein complex ({len(indices)} components; {sum(copies)} total copies)"
         self.detail_label.setText(f"{label}  ·  {props['length']} aa  ·  {props['mw'] / 1000:.2f} kDa")
         self.update_analysis(components[0] if len(components) == 1 else None)
-        for row in range(self.table.rowCount()):
-            self.table.item(row, 7).setText("—")
         try:
-            absorbance = record_a280 if single_a280 else float(self.absorbance.text())
+            absorbance = record_absorbance if single_protein else float(self.absorbance.text())
             if absorbance is None or not math.isfinite(absorbance) or absorbance < 0:
                 raise ValueError
             epsilon = props["e280"] if self.wavelength.currentText() == "A280" else props["e214"]
@@ -936,12 +931,8 @@ class MainWindow(QMainWindow):
                 return
             molar = absorbance / epsilon
             self.concentration.setText(f"{molar * 1e6:.2f} µM  ·  {molar * props['mw']:.3f} mg/mL")
-            if not is_a280:
-                a214 = (absorbance / props["e214"]) * props["mw"]
-                for row in self.table.selectionModel().selectedRows():
-                    self.table.item(row.row(), 7).setText(f"{a214:.3f} mg/mL")
         except (ValueError, TypeError):
-            self.concentration.setText("Enter A280 in this protein's table row" if single_a280 else "Enter a finite, non-negative absorbance value")
+            self.concentration.setText("Enter absorbance in this protein's table row" if single_protein else "Enter a finite, non-negative absorbance value")
 
     def update_analysis(self, props: dict | None) -> None:
         """Display non-additive properties only when exactly one protein is selected."""
@@ -976,7 +967,7 @@ class MainWindow(QMainWindow):
             writer.writerow([
                 "Name", "Folder", "Length", "Molecular weight (Da)", "Extinction coefficient 280",
                 "Extinction coefficient 214 estimate", "Calculated pI", "Aromaticity", "GRAVY hydropathy",
-                "Instability index", "Amino-acid counts", "Amino-acid percentages", "Sequence", "Notes", "A280",
+                "Instability index", "Amino-acid counts", "Amino-acid percentages", "Sequence", "Notes", "Absorbance",
             ])
             for protein in proteins:
                 props = protein_properties(protein.sequence)
@@ -985,7 +976,7 @@ class MainWindow(QMainWindow):
                 writer.writerow([
                     protein.name, protein.group, props["length"], f"{props['mw']:.2f}", props["e280"], props["e214"],
                     f"{props['pi']:.2f}", f"{props['aromaticity']:.4f}", f"{props['gravy']:.2f}",
-                    f"{props['instability_index']:.2f}", counts, percentages, protein.sequence, protein.notes, protein.absorbance_280,
+                    f"{props['instability_index']:.2f}", counts, percentages, protein.sequence, protein.notes, protein.absorbance,
                 ])
         self.statusBar().showMessage(f"Exported {len(proteins)} protein(s)", 3000)
 

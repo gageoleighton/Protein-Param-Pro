@@ -17,7 +17,12 @@ UI_STATE_FILE = APP_DIR / "ui_state.json"
 def load_proteins() -> list[Protein]:
     """Load saved proteins, returning an empty library when no valid data exists."""
     try:
-        return [Protein(**row) for row in json.loads(DATA_FILE.read_text())]
+        rows = json.loads(DATA_FILE.read_text())
+        for row in rows:
+            # Preserve absorbance saved by versions that named this field A280.
+            legacy_absorbance = row.pop("absorbance_280", None)
+            row.setdefault("absorbance", legacy_absorbance)
+        return [Protein(**row) for row in rows]
     except (FileNotFoundError, json.JSONDecodeError, TypeError):
         return []
 

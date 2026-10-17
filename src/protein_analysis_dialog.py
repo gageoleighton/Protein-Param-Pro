@@ -5,10 +5,11 @@ from __future__ import annotations
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QDialog, QDialogButtonBox, QFormLayout, QHeaderView, QLabel, QTableWidget,
-    QTableWidgetItem, QVBoxLayout, QWidget,
+    QTableWidgetItem, QTabWidget, QTextEdit, QVBoxLayout, QWidget,
 )
 
 from protein import Protein, protein_properties
+from sequence_feature_view import SequenceFeatureView, sequence_with_legend
 
 
 class ProteinAnalysisDialog(QDialog):
@@ -28,6 +29,12 @@ class ProteinAnalysisDialog(QDialog):
         subtitle.setObjectName("dialogSubtitle")
         layout.addWidget(subtitle)
 
+        tabs = QTabWidget()
+        overview = QWidget()
+        overview_layout = QVBoxLayout(overview)
+        tabs.addTab(overview, "Properties")
+        layout.addWidget(tabs)
+
         summary = QFormLayout()
         summary.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
         self.add_row(summary, "Molecular weight", f"{props['mw'] / 1000:.2f} kDa")
@@ -37,11 +44,11 @@ class ProteinAnalysisDialog(QDialog):
         self.add_row(summary, "Instability index", f"{props['instability_index']:.1f}")
         self.add_row(summary, "Extinction coefficient at 280 nm", f"{props['e280']:,} M⁻¹ cm⁻¹")
         self.add_row(summary, "Extinction coefficient at 214 nm (est.)", f"{props['e214']:,} M⁻¹ cm⁻¹")
-        layout.addLayout(summary)
+        overview_layout.addLayout(summary)
 
         composition_title = QLabel("Amino-acid composition")
         composition_title.setObjectName("dialogSectionTitle")
-        layout.addWidget(composition_title)
+        overview_layout.addWidget(composition_title)
         composition = QTableWidget(len(props["aa_counts"]), 3)
         composition.setHorizontalHeaderLabels(["Amino acid", "Count", "Percentage"])
         composition.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
@@ -54,7 +61,17 @@ class ProteinAnalysisDialog(QDialog):
                 item = QTableWidgetItem(value)
                 item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 composition.setItem(row, column, item)
-        layout.addWidget(composition, 1)
+        overview_layout.addWidget(composition, 1)
+
+        sequence_tab = QWidget()
+        sequence_layout = QVBoxLayout(sequence_tab)
+        self.sequence = QTextEdit()
+        self.sequence.setPlainText(protein.sequence)
+        self.sequence.setReadOnly(True)
+        self.features = SequenceFeatureView(self.sequence)
+        sequence_layout.addWidget(sequence_with_legend(self.sequence, self.features))
+        tabs.addTab(sequence_tab, "Sequence")
+        tabs.addTab(self.features, "Features")
 
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
         buttons.rejected.connect(self.reject)
